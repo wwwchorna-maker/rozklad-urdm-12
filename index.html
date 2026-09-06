@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Розклад пар</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .week-status {
+            display: inline-block;
+            background: #4a90e2;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        /* Віджет реального часу */
+        .live-widget {
+            background: #fff;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: 2px solid #e1e8ed;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+        .live-widget.active {
+            border-color: #4cd137;
+            background: #f1fcf0;
+            box-shadow: 0 0 15px rgba(76, 209, 55, 0.3);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(76, 209, 55, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(76, 209, 55, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 209, 55, 0); }
+        }
+
+        /* Кнопки днів тижня (Таби) */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 12px 10px;
+            border: none;
+            background: #e1e8ed;
+            color: #555;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+        .tab-btn.active {
+            background: #2c3e50;
+            color: white;
+            box-shadow: 0 4px 8px rgba(44, 62, 80, 0.3);
+        }
+
+        /* Картки пар */
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-left: 5px solid #ccc;
+        }
+        .card.lecture { border-left-color: #d1c4e9; background-color: #f5f2fa; }
+        .card.practice { border-left-color: #a8e6cf; background-color: #f0fbf7; }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .time { font-weight: bold; color: #555; }
+        .type { font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px; color: #777; }
+        .subject { font-size: 1.1em; font-weight: bold; margin: 0 0 10px 0; }
+        .location { font-weight: bold; color: #2c3e50; }
+        
+        .link-btn {
+            display: inline-block;
+            background: #2c3e50;
+            color: white;
+            padding: 8px 15px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        details {
+            margin-top: 10px;
+            background: rgba(0,0,0,0.03);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        summary { cursor: pointer; font-weight: bold; color: #4a90e2; }
+        .empty-state { text-align: center; color: #777; padding: 30px 0; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Розклад ЮРДМ-12с</h1>
+        <div class="week-status" id="weekStatus">Завантаження...</div>
+        
+        <!-- Віджет поточного стану -->
+        <div id="liveWidget" class="live-widget">
+            Завантаження даних про пари...
+        </div>
+    </div>
+
+    <!-- Кнопки днів -->
+    <div class="tabs" id="dayTabs"></div>
+
+    <!-- Контейнер для карток пар -->
+    <div id="scheduleContainer"></div>
+
+    <script>
+        // --- 1. БАЗА ДАНИХ РОЗКЛАДУ ---
+        const scheduleData = [
+            // ПОНЕДІЛОК
+            { day: 'Понеділок', pairNum: '4 пара', type: 'lecture', typeName: 'Лекція', time: '13:30 - 14:50', subject: 'Правові цінності, міжнародні стандарти та медіація у професійній діяльності юриста', teacher: 'проф. Бойко Ігор Йосипович, доц. Шевчук Ліліана Едуардівна, доц. Моряк-Протопопова Христина Миколаївна', control: 'Уточнити', link: '#', week: 'numerator' },
+            { day: 'Понеділок', pairNum: '4 пара', type: 'lecture', typeName: 'Лекція', time: '13:30 - 14:50', subject: 'Реалізація і захист прав, свобод та інтересів особи у відносинах з публічною адміністрацією', teacher: 'проф. Школик Андрій Михайлович, доц. Кузьмич Владислав Володимирович, доц. Шандра Роман Станіславович', control: 'Уточнити', links: [
+                    { url: 'https://teams.microsoft.com/meet/353632594493190?p=xhvP3xrP4nGknShJa9', name: 'Школик А.М.' },
+                    { url: '#', name: 'Кузьмич В.В.' },
+                    { url: '#', name: 'Шандра Р.С.' }
+                ], week: 'denominator' },
+            { day: 'Понеділок', pairNum: '5 пара', type: 'lecture', typeName: 'Лекція', time: '15:05 - 16:25', subject: 'Конституційні цінності та їх реалізація в Україні', teacher: 'проф. Рабінович Сергій Петрович', control: 'Уточнити', link: 'https://us05web.zoom.us/j/84434662211?pwd=Z0h4h2advq6vHha2zZ1Aafmw6tLhwC.1', week: 'numerator' },
+            { day: 'Понеділок', pairNum: '5 пара', type: 'lecture', typeName: 'Лекція', time: '15:05 - 16:25', subject: 'Соціально-правові стандарти захисту прав та інтересів громадян в умовах глобалізації ринку праці', teacher: 'проф. Пилипенко Пилип Данилович, проф. Синчук Світлана Миколаївна, проф. Рим Олена Михайлівна', control: 'Уточнити', link: 'https://teams.microsoft.com/meet/396214749549439?p=d6e7wuFg29mNEzn4QU', week: 'denominator' },
+            { day: 'Понеділок', pairNum: '6 пара', type: 'lecture', typeName: 'Лекція', time: '16:40 - 18:00', subject: 'Теоретико-прикладні засади юридичної діяльності', teacher: 'проф. Косович Віталій Мирославович, проф. Раданович Наталія Миколаївна, д.ю.н. Настасяк Ірина Юріївна, доц. Ничка Юрій Вадимович, доц. Лубчук Олена Дмитрівна, к.ю.н. Маленевський Андрій Олександрович, проф. Дудаш Тамара Іванівна', control: 'Уточнити', link: 'https://us05web.zoom.us/j/84350477120?pwd=aqd7qObhwldDQu4gunezTNMsBc7NIb.1', week: 'numerator' },
+
+            // ВІВТОРОК
+            { day: 'Вівторок', pairNum: '3 пара', type: 'practice', typeName: 'Практичне', time: '11:50 - 13:10', subject: 'Реалізація і захист прав, свобод та інтересів особи у відносинах з публічною адміністрацією', teacher: 'доц. Гудз Богдан Данилович', control: 'Уточнити', auditorium: 'ауд. 301Ю', week: 'numerator' },
+            { day: 'Вівторок', pairNum: '4 пара', type: 'practice', typeName: 'Практичне', time: '13:30 - 14:50', subject: 'Теоретико-прикладні засади юридичної діяльності', teacher: 'проф. Косович Віталій Мирославович', control: 'Уточнити', auditorium: 'ауд. 301Ю', week: 'all' },
+            { day: 'Вівторок', pairNum: '5 пара', type: 'practice', typeName: 'Практичне', time: '15:05 - 16:25', subject: 'Конституційні цінності та їх реалізація в Україні', teacher: 'проф. Рабінович Сергій Петрович', control: 'Уточнити', auditorium: 'ауд. 201', week: 'numerator' },
+            { day: 'Вівторок', pairNum: '5 пара', type: 'practice', typeName: 'Практичне', time: '15:05 - 16:25', subject: 'Правові цінності, міжнародні стандарти та медіація у професійній діяльності юриста', teacher: 'доц. Федущак-Паславська Ганна Михайлівна', control: 'Уточнити', auditorium: 'ауд. 201', week: 'denominator' },
+            { day: 'Вівторок', pairNum: '6 пара', type: 'practice', typeName: 'Практичне', time: '16:40 - 18:00', subject: 'Соціально-правові стандарти захисту прав та інтересів громадян в умовах глобалізації ринку праці', teacher: 'проф. Синчук Світлана Миколаївна', control: 'Уточнити', auditorium: 'ауд. 202', week: 'all' },
+
+            // СЕРЕДА
+            { day: 'Середа', pairNum: '4 пара', type: 'lecture', typeName: 'Лекція', time: '13:30 - 14:50', subject: 'ВНД Громадянське суспільство в Україні та його взаємодія з державою: конституційно-правовий аспект', teacher: 'доц. Заяць Ігор Ярославович', control: 'Уточнити', link: 'https://teams.microsoft.com/l/team/19%3AXnghqj7jgxVewfvxSUy4ck8KpvdU2KnCoNmwiLQLIBo1%40thread.tacv2/conversations?groupId=789e27ac-cdcb-4f99-bfaa-1b2dc11660c4&tenantId=70a28522-969b-451f-bdb2-abfea3aaa5bf', week: 'numerator' },
+            { day: 'Середа', pairNum: '4 пара', type: 'practice', typeName: 'Практичне', time: '13:30 - 14:50', subject: 'ВНД Громадянське суспільство в Україні та його взаємодія з державою: конституційно-правовий аспект', teacher: 'к.ю.н. Ковтуняк Вікторія Олегівна', control: 'Уточнити', link: '#', week: 'denominator' },
+            { day: 'Середа', pairNum: '5 пара', type: 'lecture', typeName: 'Лекція', time: '15:05 - 16:25', subject: 'ВНД Захист конституційного ладу в Україні', teacher: 'доц. Кобрин Володимир Степанович', control: 'Уточнити', link: 'https://us04web.zoom.us/j/76527909121?pwd=eNKGMuIAIaTWyDKmNbo57KqOkHgEQe.1', week: 'numerator' },
+            { day: 'Середа', pairNum: '5 пара', type: 'practice', typeName: 'Практичне', time: '15:05 - 16:25', subject: 'ВНД Захист конституційного ладу в Україні', teacher: 'к.ю.н. Арєф’єв Максим Дмитрович', control: 'Уточнити', link: '#', week: 'denominator' },
+            { day: 'Середа', pairNum: '6 пара', type: 'lecture', typeName: 'Лекція', time: '16:40 - 18:00', subject: 'ВНД Вирішення виборчих спорів', teacher: 'доц. Чорненький Віталій Ігорович', control: 'Уточнити', link: 'https://us02web.zoom.us/j/84382789972?pwd=F01wBCYvbkublPPRmjZaB1HYqVkLKI.1', week: 'numerator' },
+            { day: 'Середа', pairNum: '6 пара', type: 'practice', typeName: 'Практичне', time: '16:40 - 18:00', subject: 'ВНД Вирішення виборчих спорів', teacher: 'доц. Дубас Вікторія Василівна', control: 'Уточнити', link: '#', week: 'denominator' }
+        ];
+
+        // --- 2. ЛОГІКА ЧАСУ ТА ТИЖНЯ ---
+        const dayMap = { 'Понеділок': 1, 'Вівторок': 2, 'Середа': 3, 'Четвер': 4, 'П\'ятниця': 5, 'Субота': 6, 'Неділя': 7 };
+        
+        // Функція для визначення чисельника/знаменника
+        function getWeekTypeObj(dateObj) {
+            const startOfSemester = new Date(dateObj.getFullYear(), 8, 1); 
+            const dayOfWeek = startOfSemester.getDay(); 
+            const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; 
+            const startMonday = new Date(startOfSemester);
+            startMonday.setDate(startMonday.getDate() - daysToSubtract);
+            const diffTime = Math.abs(dateObj - startMonday);
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            const weekNumber = Math.floor(diffDays / 7) + 1;
+            return weekNumber % 2 !== 0 ? 'numerator' : 'denominator';
+        }
+
+        const currentWeekStr = getWeekTypeObj(new Date()) === 'numerator' ? 'Чисельник' : 'Знаменник';
+        document.getElementById('weekStatus').innerText = 'Зараз: ' + currentWeekStr;
+
+        // Перетворюємо час "13:30 - 14:50" у хвилини для розрахунків
+        function parseTime(timeStr, dayStr) {
+            const [start, end] = timeStr.split(' - ');
+            const [sh, sm] = start.split(':').map(Number);
+            const [eh, em] = end.split(':').map(Number);
+            const dayIdx = dayMap[dayStr];
+            return {
+                startMins: dayIdx * 24 * 60 + sh * 60 + sm,
+                endMins: dayIdx * 24 * 60 + eh * 60 + em
+            };
+        }
+
+        // --- 3. ВІДЖЕТ РЕАЛЬНОГО ЧАСУ ---
+        function updateLiveWidget() {
+            const now = new Date();
+            let currentDayInt = now.getDay() || 7; // Неділя = 7
+            const currentMins = currentDayInt * 24 * 60 + now.getHours() * 60 + now.getMinutes();
+            
+            const currentWeekType = getWeekTypeObj(now);
+            
+            // Залишаємо тільки ті пари, що йдуть на цьому тижні
+            let activeClasses = scheduleData.filter(c => c.week === 'all' || c.week === currentWeekType)
+                .map(c => ({ ...c, ...parseTime(c.time, c.day) }))
+                .sort((a, b) => a.startMins - b.startMins);
+
+            // Шукаємо, чи йде якась пара прямо зараз
+            let currentClass = activeClasses.find(c => currentMins >= c.startMins && currentMins <= c.endMins);
+            const widget = document.getElementById('liveWidget');
+
+            if (currentClass) {
+                widget.className = 'live-widget active';
+                widget.innerHTML = `<strong>🟢 Зараз іде (${currentClass.pairNum}):</strong><br> ${currentClass.time} — ${currentClass.subject}`;
+            } else {
+                widget.className = 'live-widget';
+                // Шукаємо найближчу наступну пару на цьому тижні
+                let nextClass = activeClasses.find(c => c.startMins > currentMins);
+                
+                // Якщо на цьому тижні пар більше немає (напр. середа вечір), шукаємо пару на НАСТУПНОМУ тижні
+                if (!nextClass) {
+                    const nextWeekType = currentWeekType === 'numerator' ? 'denominator' : 'numerator';
+                    let nextWeekClasses = scheduleData.filter(c => c.week === 'all' || c.week === nextWeekType)
+                        .map(c => ({ ...c, ...parseTime(c.time, c.day) }))
+                        .sort((a, b) => a.startMins - b.startMins);
+                    nextClass = nextWeekClasses[0]; // Перша пара наступного тижня
+                }
+
+                if (nextClass) {
+                    widget.innerHTML = `<strong>⏳ Найближча пара:</strong><br>${nextClass.day}, ${nextClass.pairNum} (${nextClass.time}) — ${nextClass.subject}`;
+                } else {
+                    widget.innerHTML = `Вільний час! Найближчих пар немає.`;
+                }
+            }
+        }
+
+        // --- 4. НАВІГАЦІЯ (ТАБИ) ТА ВІДОБРАЖЕННЯ ---
+        const days = ['Понеділок', 'Вівторок', 'Середа'];
+        let selectedDay = days[0];
+
+        // Визначаємо сьогоднішній день. Якщо сьогодні Пн, Вт або Ср — відкриваємо його.
+        const todayStr = Object.keys(dayMap).find(key => dayMap[key] === (new Date().getDay() || 7));
+        if (days.includes(todayStr)) selectedDay = todayStr;
+
+        function renderTabs() {
+            const tabsHtml = days.map(day =>
+                `<button class="tab-btn ${day === selectedDay ? 'active' : ''}" onclick="selectDay('${day}')">${day}</button>`
+            ).join('');
+            document.getElementById('dayTabs').innerHTML = tabsHtml;
+        }
+
+        function selectDay(day) {
+            selectedDay = day;
+            renderTabs();
+            renderSchedule();
+        }
+
+        function renderSchedule() {
+            const container = document.getElementById('scheduleContainer');
+            container.innerHTML = ''; 
+
+            const currentWeekType = getWeekTypeObj(new Date());
+            const dayClasses = scheduleData.filter(c => 
+                c.day === selectedDay && (c.week === 'all' || c.week === currentWeekType)
+            );
+
+            if (dayClasses.length > 0) {
+                let dayHTML = ``;
+                dayClasses.forEach(c => {
+                    let locationOrLink = '';
+                    if (c.auditorium) locationOrLink = `<div class="location">📍 ${c.auditorium}</div>`;
+                    if (c.link) locationOrLink = `<a href="${c.link}" class="link-btn" target="_blank">🎥 Приєднатися до дзвінка</a>`;
+
+                    dayHTML += `
+                        <div class="card ${c.type}">
+                            <div class="card-header">
+                                <span class="time">🕒 ${c.time} (${c.pairNum})</span>
+                                <span class="type">${c.typeName}</span>
+                            </div>
+                            <h3 class="subject">${c.subject}</h3>
+                            ${locationOrLink}
+                            <details>
+                                <summary>▶ Деталі про предмет</summary>
+                                <p><strong>Викладач:</strong> ${c.teacher}</p>
+                                <p><strong>Тип контролю:</strong> ${c.control}</p>
+                            </details>
+                        </div>
+                    `;
+                });
+                container.innerHTML = dayHTML;
+            } else {
+                container.innerHTML = `<div class="empty-state">У цей день (${selectedDay}) за поточним розкладом пар немає.</div>`;
+            }
+        }
+
+        // Запуск
+        renderTabs();
+        renderSchedule();
+        updateLiveWidget();
+        // Оновлювати віджет реального часу кожну хвилину
+        setInterval(updateLiveWidget, 60000); 
+
+    </script>
+</body>
+</html>
