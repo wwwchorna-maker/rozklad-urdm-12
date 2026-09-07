@@ -24,9 +24,29 @@
             padding: 8px 16px;
             border-radius: 20px;
             font-weight: bold;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
+            transition: background-color 0.3s;
         }
         
+        /* Кнопка перемикання тижня */
+        .toggle-btn {
+            display: block;
+            margin: 0 auto 15px auto;
+            background: white;
+            color: #2c3e50;
+            border: 2px solid #2c3e50;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 0.9em;
+        }
+        .toggle-btn:hover {
+            background: #2c3e50;
+            color: white;
+        }
+
         /* Віджет реального часу */
         .live-widget {
             background: #fff;
@@ -99,6 +119,13 @@
         .subject { font-size: 1.1em; font-weight: bold; margin: 0 0 10px 0; }
         .location { font-weight: bold; color: #2c3e50; }
         
+        /* Стилі для кількох посилань (на випадок використання) */
+        .links-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
         .link-btn {
             display: inline-block;
             background: #2c3e50;
@@ -108,6 +135,9 @@
             border-radius: 5px;
             font-size: 0.9em;
             margin-top: 10px;
+        }
+        .links-container .link-btn {
+            margin-top: 0;
         }
         details {
             margin-top: 10px;
@@ -124,6 +154,9 @@
     <div class="header">
         <h1>Розклад ЮРДМ-12с</h1>
         <div class="week-status" id="weekStatus">Завантаження...</div>
+        
+        <!-- Кнопка перемикання -->
+        <button id="weekToggleBtn" class="toggle-btn" onclick="toggleWeek()">Завантаження...</button>
         
         <!-- Віджет поточного стану -->
         <div id="liveWidget" class="live-widget">
@@ -166,7 +199,6 @@
         // --- 2. ЛОГІКА ЧАСУ ТА ТИЖНЯ ---
         const dayMap = { 'Понеділок': 1, 'Вівторок': 2, 'Середа': 3, 'Четвер': 4, 'П\'ятниця': 5, 'Субота': 6, 'Неділя': 7 };
         
-        // Функція для визначення чисельника/знаменника
         function getWeekTypeObj(dateObj) {
             const startOfSemester = new Date(dateObj.getFullYear(), 8, 1); 
             const dayOfWeek = startOfSemester.getDay(); 
@@ -179,10 +211,39 @@
             return weekNumber % 2 !== 0 ? 'numerator' : 'denominator';
         }
 
-        const currentWeekStr = getWeekTypeObj(new Date()) === 'numerator' ? 'Чисельник' : 'Знаменник';
-        document.getElementById('weekStatus').innerText = 'Зараз: ' + currentWeekStr;
+        let actualWeekType = getWeekTypeObj(new Date()); 
+        let displayedWeekType = actualWeekType; 
 
-        // Перетворюємо час "13:30 - 14:50" у хвилини для розрахунків
+        function updateWeekUI() {
+            const statusEl = document.getElementById('weekStatus');
+            const btnEl = document.getElementById('weekToggleBtn');
+            
+            const actualWeekStr = actualWeekType === 'numerator' ? 'Чисельник' : 'Знаменник';
+            const displayedWeekStr = displayedWeekType === 'numerator' ? 'Чисельник' : 'Знаменник';
+
+            if (actualWeekType === displayedWeekType) {
+                statusEl.innerText = 'Поточний тиждень: ' + actualWeekStr;
+                statusEl.style.backgroundColor = '#4a90e2'; 
+                
+                const nextWeekStr = actualWeekType === 'numerator' ? 'Знаменник' : 'Чисельник';
+                btnEl.innerText = '👉 Подивитися розклад на ' + nextWeekStr;
+            } else {
+                statusEl.innerText = 'Перегляд: ' + displayedWeekStr;
+                statusEl.style.backgroundColor = '#f39c12'; 
+                btnEl.innerText = '👈 Повернутися до поточного тижня';
+            }
+        }
+
+        function toggleWeek() {
+            if (displayedWeekType === actualWeekType) {
+                displayedWeekType = actualWeekType === 'numerator' ? 'denominator' : 'numerator';
+            } else {
+                displayedWeekType = actualWeekType;
+            }
+            updateWeekUI();
+            renderSchedule();
+        }
+
         function parseTime(timeStr, dayStr) {
             const [start, end] = timeStr.split(' - ');
             const [sh, sm] = start.split(':').map(Number);
@@ -197,17 +258,13 @@
         // --- 3. ВІДЖЕТ РЕАЛЬНОГО ЧАСУ ---
         function updateLiveWidget() {
             const now = new Date();
-            let currentDayInt = now.getDay() || 7; // Неділя = 7
+            let currentDayInt = now.getDay() || 7; 
             const currentMins = currentDayInt * 24 * 60 + now.getHours() * 60 + now.getMinutes();
             
-            const currentWeekType = getWeekTypeObj(now);
-            
-            // Залишаємо тільки ті пари, що йдуть на цьому тижні
-            let activeClasses = scheduleData.filter(c => c.week === 'all' || c.week === currentWeekType)
+            let activeClasses = scheduleData.filter(c => c.week === 'all' || c.week === actualWeekType)
                 .map(c => ({ ...c, ...parseTime(c.time, c.day) }))
                 .sort((a, b) => a.startMins - b.startMins);
 
-            // Шукаємо, чи йде якась пара прямо зараз
             let currentClass = activeClasses.find(c => currentMins >= c.startMins && currentMins <= c.endMins);
             const widget = document.getElementById('liveWidget');
 
@@ -216,16 +273,14 @@
                 widget.innerHTML = `<strong>🟢 Зараз іде (${currentClass.pairNum}):</strong><br> ${currentClass.time} — ${currentClass.subject}`;
             } else {
                 widget.className = 'live-widget';
-                // Шукаємо найближчу наступну пару на цьому тижні
                 let nextClass = activeClasses.find(c => c.startMins > currentMins);
                 
-                // Якщо на цьому тижні пар більше немає (напр. середа вечір), шукаємо пару на НАСТУПНОМУ тижні
                 if (!nextClass) {
-                    const nextWeekType = currentWeekType === 'numerator' ? 'denominator' : 'numerator';
+                    const nextWeekType = actualWeekType === 'numerator' ? 'denominator' : 'numerator';
                     let nextWeekClasses = scheduleData.filter(c => c.week === 'all' || c.week === nextWeekType)
                         .map(c => ({ ...c, ...parseTime(c.time, c.day) }))
                         .sort((a, b) => a.startMins - b.startMins);
-                    nextClass = nextWeekClasses[0]; // Перша пара наступного тижня
+                    nextClass = nextWeekClasses[0]; 
                 }
 
                 if (nextClass) {
@@ -236,11 +291,10 @@
             }
         }
 
-        // --- 4. НАВІГАЦІЯ (ТАБИ) ТА ВІДОБРАЖЕННЯ ---
+        // --- 4. НАВІГАЦІЯ ТА ВІДОБРАЖЕННЯ ---
         const days = ['Понеділок', 'Вівторок', 'Середа'];
         let selectedDay = days[0];
 
-        // Визначаємо сьогоднішній день. Якщо сьогодні Пн, Вт або Ср — відкриваємо його.
         const todayStr = Object.keys(dayMap).find(key => dayMap[key] === (new Date().getDay() || 7));
         if (days.includes(todayStr)) selectedDay = todayStr;
 
@@ -261,17 +315,28 @@
             const container = document.getElementById('scheduleContainer');
             container.innerHTML = ''; 
 
-            const currentWeekType = getWeekTypeObj(new Date());
             const dayClasses = scheduleData.filter(c => 
-                c.day === selectedDay && (c.week === 'all' || c.week === currentWeekType)
+                c.day === selectedDay && (c.week === 'all' || c.week === displayedWeekType)
             );
 
             if (dayClasses.length > 0) {
                 let dayHTML = ``;
                 dayClasses.forEach(c => {
                     let locationOrLink = '';
-                    if (c.auditorium) locationOrLink = `<div class="location">📍 ${c.auditorium}</div>`;
-                    if (c.link) locationOrLink = `<a href="${c.link}" class="link-btn" target="_blank">🎥 Приєднатися до дзвінка</a>`;
+                    
+                    if (c.links) {
+                        let linksHtml = '';
+                        c.links.forEach(l => {
+                            linksHtml += `<a href="${l.url}" class="link-btn" target="_blank">🎥 Приєднатися (${l.name})</a>`;
+                        });
+                        locationOrLink = `<div class="links-container">${linksHtml}</div>`;
+                    } 
+                    else if (c.link) {
+                        locationOrLink = `<a href="${c.link}" class="link-btn" target="_blank">🎥 Приєднатися до дзвінка</a>`;
+                    } 
+                    else if (c.auditorium) {
+                        locationOrLink = `<div class="location">📍 ${c.auditorium}</div>`;
+                    }
 
                     dayHTML += `
                         <div class="card ${c.type}">
@@ -291,15 +356,15 @@
                 });
                 container.innerHTML = dayHTML;
             } else {
-                container.innerHTML = `<div class="empty-state">У цей день (${selectedDay}) за поточним розкладом пар немає.</div>`;
+                container.innerHTML = `<div class="empty-state">У цей день (${selectedDay}) пар за розкладом немає.</div>`;
             }
         }
 
         // Запуск
+        updateWeekUI();
         renderTabs();
         renderSchedule();
         updateLiveWidget();
-        // Оновлювати віджет реального часу кожну хвилину
         setInterval(updateLiveWidget, 60000); 
 
     </script>
